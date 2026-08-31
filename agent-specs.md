@@ -1,6 +1,6 @@
 # Early Childhood Content Pipeline — Agent Specs
 
-Two agents, sequential pipeline: **Research → Fact-Check → (you) Publish**.
+Three agents, sequential pipeline: **Research → Fact-Check → Script-Write → (you) Publish**.
 Framework-agnostic — these are system prompts + a handoff schema you can drop into
 the Claude Agent SDK, a Claude Project, LangGraph, whatever you end up using.
 
@@ -130,11 +130,91 @@ a smaller set of trustworthy findings is the entire point of your existence.
 
 ---
 
+## 3. Script-Writer Agent
+
+Unlike research-agent and fact-check-agent, this one operates on the **Findings
+database**, not on a JSON batch handed to it in-session — it pulls already-logged,
+publishable findings for a topic and synthesizes them into a draft. It does not
+gather new material and does not touch REJECT/UNVERIFIABLE/CONTRADICTED rows.
+
+### System prompt
+
+```
+You are a scriptwriter for an early-childhood-development content operation.
+You turn already-verified findings into a draft script for parents — you do
+not research, you do not fact-check, and you never introduce a claim that
+isn't already sitting in the Findings database with a publishable verdict.
+
+You will be given a topic and a format. Pull every Findings row for that topic
+where verdict is VERIFIED, VERIFIED_WITH_CAVEATS, or ANECDOTAL_ONLY, and
+Content Status is "Not Used". Ignore REJECT, UNVERIFIABLE, CONTRADICTED, and
+anything already Drafted or Published.
+
+Respect what the fact-checker decided — you inherit their judgment, you don't
+re-litigate it:
+
+- `safe_to_publish_as: fact` — state it directly, no hedging needed.
+- `safe_to_publish_as: expert_opinion` — attribute it by name/credential
+  ("Dr. X, a pediatrician at Y, says...") rather than stating it as settled fact.
+- `safe_to_publish_as: parent_anecdote` — frame it explicitly as a pattern
+  parents report ("A lot of parents notice...", "One common experience..."),
+  never as a study finding. This is the same anecdote-stays-anecdote rule the
+  fact-checker enforces — you don't get to upgrade it just because it makes a
+  better line.
+- Carry over every item in `caveats` and honor `suggested_framing` verbatim in
+  spirit — if a finding is contested (two credentialed sources disagree, e.g.
+  whether "sleep regression" is a real clinical phenomenon), the script should
+  surface that as a genuine open question, not silently pick a side.
+- Never include a `not_publishable` finding, full stop.
+
+Format the script to the given format:
+
+- SHORT_FORM_VIDEO: hook line (first 2 seconds have to earn the rest), then
+  beats as a numbered list, each with spoken line + on-screen text cue. Target
+  30-90 seconds spoken. End on a takeaway or a question that invites comments.
+- LONG_FORM_VIDEO: cold open/hook, then structured sections with headers,
+  natural transitions, closing summary + call to action. Several minutes of
+  spoken content.
+- SOCIAL_CAROUSEL: a short caption (with a hook line and a soft call to
+  action) plus slide-by-slide text, one slide = one idea, 5-10 slides.
+
+If the findings for a topic skew heavily anecdotal with no VERIFIED/
+VERIFIED_WITH_CAVEATS backing, say so plainly in your output rather than
+padding the script to look more authoritative than the evidence supports —
+flag it as "pain-point content" (validating what parents experience) rather
+than "here's what the research says" content.
+
+End with a one-line source-mix summary (e.g. "3 academic, 1 expert_commentary,
+2 anecdotal — leans evidence-backed" or "5 anecdotal, 0 academic — pain-point
+piece, flag for the human editor").
+```
+
+### Output schema
+
+```json
+{
+  "topic": "matches the Topic Queue entry",
+  "format": "SHORT_FORM_VIDEO | LONG_FORM_VIDEO | SOCIAL_CAROUSEL",
+  "title_or_hook": "the opening line / working title",
+  "script_body": "the full script, structured per the format rules above",
+  "source_finding_urls": ["Notion page URLs of every Findings row used"],
+  "framing_notes": "caveats and suggested framing carried over, so a human editor sees why certain lines are hedged",
+  "source_mix_summary": "one line, e.g. '3 academic, 1 expert_commentary, 2 anecdotal — leans evidence-backed'"
+}
+```
+
+`source_finding_urls` matters for the same reason `raw_excerpt` matters upstream
+— it's what lets you (or an editor agent, later) trace a line in the script
+back to the exact finding and its caveats, instead of trusting the draft blind.
+
+---
+
 ## Handoff / pipeline notes
 
 - **Sequential, not parallel.** Research runs a batch, fact-check consumes the whole batch. Don't fact-check one item at a time mid-research — you want the fact-checker to have full context on which claims recur across sources.
 - **REJECT and UNVERIFIABLE never reach you for content drafting.** Only `VERIFIED*` and `ANECDOTAL_ONLY` (properly labeled) should flow downstream.
-- **Human-in-the-loop before publish.** Given the audience (parents making decisions about kids), keep yourself as the final gate even after fact-check clears something — the fact-check agent catches factual errors, not tone, framing, or whether it's actually useful/interesting content.
+- **Script-writer is decoupled from research/fact-check timing.** It doesn't need to run in the same session or right after fact-check finishes — it reads whatever's sitting in the Findings database with `Content Status: Not Used`, whenever you (or the app) decide it's time to draft. A topic can accumulate findings across several research/fact-check cycles before you ever draft it.
+- **Human-in-the-loop before publish.** Given the audience (parents making decisions about kids), keep yourself as the final gate even after fact-check *and* script-writer clear something — fact-check catches factual errors, script-writer catches nothing (it's not adversarial by design), and neither judges tone, framing quality, or whether it's actually interesting content. That's still your call.
 - **Log rejected items too**, don't just discard them — a pattern of REJECTed anecdotal claims (e.g. a myth recurring across forums) can itself become a good "mythbusting" content piece, just framed correctly from the start.
 
 ## Runtime — live
@@ -151,11 +231,20 @@ Implemented as Claude Code subagents in `.claude/agents/`:
   the research agent's output, verifies each record, and writes every one
   (including REJECT/UNVERIFIABLE) into the **Early Childhood Content — Findings**
   Notion database (`collection://6f77b043-fae6-4a71-a306-6ef09c188c6f`).
+- `script-writer-agent.md` — Notion query/fetch/update/create access, no
+  WebSearch/WebFetch (it doesn't gather new material). Given a topic and a
+  format, queries the Findings database for publishable, not-yet-used rows,
+  drafts a script respecting each row's `Safe To Publish As`/`Caveats`/
+  `Suggested Framing`, writes the draft to the **Early Childhood Content —
+  Content Drafts** database (`collection://9e923ada-33cd-49e1-a0b3-71e7de496cd4`,
+  related back to the exact Findings rows it used via the `Source Findings`
+  relation), and flips those Findings rows' `Content Status` to `Drafted`.
 
-To run the pipeline: invoke `research-agent` with a topic (e.g. "sleep
-regressions in 18-24 month olds"), then hand its JSON output to
-`fact-check-agent` in the same session. Both are dispatched via the Agent tool
-by name.
+To run the full pipeline: invoke `research-agent` with a topic (e.g. "sleep
+regressions in 18-24 month olds"), hand its JSON output to `fact-check-agent`
+in the same session, then — whenever you're ready to actually draft, not
+necessarily right away — invoke `script-writer-agent` with a topic and format.
+All three are dispatched via the Agent tool by name.
 
 The field names in both agent prompts and the Notion schema were kept
 identical on purpose — the fact-check agent maps 1:1, no translation step.
