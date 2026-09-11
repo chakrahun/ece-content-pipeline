@@ -116,7 +116,14 @@ export function startRun(topic: string, topicId: string | null): Job {
   const child = spawn(
     CLAUDE_BIN,
     ["-p", buildPrompt(topic), "--permission-mode", "bypassPermissions"],
-    { cwd: REPO_ROOT, env: process.env, windowsHide: true }
+    {
+      cwd: REPO_ROOT,
+      env: process.env,
+      windowsHide: true,
+      // Prompt is passed as an arg; give the CLI no stdin so it doesn't wait 3s
+      // for piped input. stdout/stderr stay pipes so we can capture the log.
+      stdio: ["ignore", "pipe", "pipe"],
+    }
   );
 
   const append = (chunk: Buffer) => {
