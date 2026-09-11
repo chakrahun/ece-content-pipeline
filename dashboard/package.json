@@ -1,0 +1,23 @@
+{
+  "name": "ece-pipeline-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local control panel over the ECE content pipeline's Notion databases",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
