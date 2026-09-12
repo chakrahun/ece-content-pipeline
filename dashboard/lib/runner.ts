@@ -15,10 +15,13 @@ const RUNS_DIR = path.join(os.tmpdir(), "ece-dashboard-runs");
 const CLAUDE_BIN =
   process.env.CLAUDE_BIN || "C:\\Users\\hunch\\.local\\bin\\claude.exe";
 
+export type RunKind = "pipeline" | "ideas";
+
 export type Job = {
   id: string;
   topic: string;
   topicId: string | null; // Notion page id of the Topic Queue row, if any
+  kind: RunKind; // "pipeline" = research + fact-check; "ideas" = idea-agent
   status: "running" | "done" | "error";
   startedAt: string;
   endedAt?: string;
@@ -67,6 +70,14 @@ export function isTopicRunning(topicId: string | null): boolean {
   return listJobs().some((j) => j.status === "running" && j.topicId === topicId);
 }
 
+// Is an idea run for this exact topic string already in flight?
+export function isIdeaRunning(topic: string): boolean {
+  const t = topic.trim().toLowerCase();
+  return listJobs().some(
+    (j) => j.status === "running" && j.kind === "ideas" && j.topic.trim().toLowerCase() === t
+  );
+}
+
 function lastMeaningfulLine(text: string): string {
   const lines = text
     .split(/\r?\n/)
@@ -100,22 +111,39 @@ Steps:
 Do not ask any questions — run to completion autonomously. Do not modify the Topic Queue; the dashboard handles queue status.`;
 }
 
-export function startRun(topic: string, topicId: string | null): Job {
+function buildIdeaPrompt(topic: string): string {
+  return `You are generating content ideas for the ECE content pipeline, non-interactively. Idea generation only — do NOT research, fact-check, or write scripts.
+
+Topic to process: "${topic}"
+
+Steps:
+1. Use the idea-agent subagent for this exact topic. It reads only VERIFIED / VERIFIED_WITH_CAVEATS findings for the topic from the "Early Childhood Content — Findings" Notion database and generates a spread of educational content ideas and digital-product concepts, writing each as a page in the "Early Childhood Content — Content Ideas" Notion database (Status = New).
+2. If there are no verified findings for the topic, do not invent any — report that the topic needs more research first.
+3. Finish with a single final line in this exact form:
+   RESULT: <n> ideas written | <format spread, e.g. 4 digital products, 2 carousels, 2 video>
+
+Do not ask any questions — run to completion autonomously.`;
+}
+
+export function startRun(topic: string, topicId: string | null, kind: RunKind = "pipeline"): Job {
   ensureDir();
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const job: Job = {
     id,
     topic,
     topicId,
+    kind,
     status: "running",
     startedAt: new Date().toISOString(),
   };
   saveJob(job);
-  fs.writeFileSync(logPath(id), `# Run started ${job.startedAt}\n# Topic: ${topic}\n\n`);
+  const kindLabel = kind === "ideas" ? "idea generation" : "research + fact-check";
+  fs.writeFileSync(logPath(id), `# Run started ${job.startedAt}\n# Kind: ${kindLabel}\n# Topic: ${topic}\n\n`);
 
+  const prompt = kind === "ideas" ? buildIdeaPrompt(topic) : buildPrompt(topic);
   const child = spawn(
     CLAUDE_BIN,
-    ["-p", buildPrompt(topic), "--permission-mode", "bypassPermissions"],
+    ["-p", prompt, "--permission-mode", "bypassPermissions"],
     {
       cwd: REPO_ROOT,
       env: process.env,

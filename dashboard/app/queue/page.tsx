@@ -173,7 +173,7 @@ export default function QueuePage() {
         </table>
       </div>
 
-      <RunsPanel jobs={jobs} />
+      <RunsPanel jobs={jobs.filter((j) => j.kind !== "ideas")} />
 
       {adding && (
         <AddTopicModal

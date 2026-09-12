@@ -51,6 +51,17 @@ export default function OverviewPage() {
             <div className="v">{data.findings.total}</div>
             <Breakdown data={data.findings.byContentStatus} />
           </Link>
+          <Link href="/ideas" className="card" style={{ textDecoration: "none" }}>
+            <div className="k">Ideas · by status</div>
+            <div className="v">{data.ideas?.total ?? 0}</div>
+            {data.ideas?.configured === false ? (
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Connect the Content Ideas DB to your integration to enable.
+              </div>
+            ) : (
+              <Breakdown data={data.ideas?.byStatus || {}} />
+            )}
+          </Link>
           <Link href="/drafts" className="card" style={{ textDecoration: "none" }}>
             <div className="k">Drafts</div>
             <div className="v">{data.drafts.total}</div>

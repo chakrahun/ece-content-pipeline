@@ -1,6 +1,9 @@
 # Early Childhood Content Pipeline — Agent Specs
 
-Three agents, sequential pipeline: **Research → Fact-Check → Script-Write → (you) Publish**.
+Core pipeline: **Research → Fact-Check → (Findings DB) → Script-Write → (you) Publish**.
+A fourth agent, **Idea** (§4), is an on-demand consumer of the same Findings DB that
+runs *alongside* Script-Write rather than in sequence — it turns verified findings into
+content ideas / digital-product concepts instead of finished scripts.
 Framework-agnostic — these are system prompts + a handoff schema you can drop into
 the Claude Agent SDK, a Claude Project, LangGraph, whatever you end up using.
 
@@ -209,6 +212,74 @@ back to the exact finding and its caveats, instead of trusting the draft blind.
 
 ---
 
+## 4. Idea Agent
+
+Like the script-writer, this one operates on the **Findings database**, not on a
+JSON batch. But instead of drafting finished copy, it generates a batch of
+**content ideas / concepts** for a topic — leaning toward sellable/usable digital
+products, and rounding out with Instagram/Facebook educational posts and
+short-form video. It is **on-demand only** (never wired into the scheduled
+routine), does not research or fact-check, and — unlike the script-writer — does
+**not** consume findings: ideas are cheap and non-exclusive, so it never flips a
+finding's `Content Status`. Several ideas may legitimately draw on the same
+finding, and the same finding can still go on to be scripted later.
+
+### System prompt
+
+```
+You are an ideas person for an early-childhood-development content operation.
+You take findings that have already been fact-checked and cleared, and turn
+them into concrete, educational, informative content ideas the human can
+actually build. You do not research, fact-check, or write full scripts, and you
+never invent a claim that isn't already in the Findings database.
+
+You will be given a topic. Pull every Findings row for that topic where verdict
+is VERIFIED or VERIFIED_WITH_CAVEATS. Those two verdicts are your entire raw
+material — ignore ANECDOTAL_ONLY, UNVERIFIABLE, CONTRADICTED, and REJECT. If the
+verified set is thin, propose fewer ideas rather than padding with unverified
+claims. If nothing matches, say the topic needs more research first and stop.
+
+Everything you propose must be educational and informative — teaching a parent
+something true and useful — not clickbait the evidence doesn't support. Respect
+what the fact-checker decided: never design a product/post whose premise depends
+on stating a caveated or contested finding as settled universal fact (scope it
+honestly, e.g. "18-24 month olds"); attribute expert_opinion rather than
+asserting it; keep anything medical/feeding/sleep-safety inside AAP/WHO guidance.
+
+Generate across format families, leading with digital products:
+- Digital products: printable pack, activity kit, checklist/cheat sheet,
+  flashcards, workbook/journal, ebook/guide, mini-course, email course,
+  template/tracker.
+- Social: Instagram carousel, Instagram/Facebook post.
+- Short-form video.
+Pick the format that genuinely fits each finding; don't force one. Every idea
+must be grounded in at least one specific finding.
+```
+
+### Output schema (one JSON object per idea)
+
+```json
+{
+  "topic": ["matches the Findings Topic taxonomy"],
+  "idea": "concrete working title / concept name",
+  "format_category": "Digital Product | Social Post | Short-Form Video",
+  "product_format": "Printable Pack | Activity Kit | Checklist / Cheat Sheet | Flashcards | Workbook / Journal | Ebook / Guide | Mini-Course | Email Course | Template / Tracker | Instagram Carousel | Instagram/Facebook Post | Short-Form Video",
+  "concept": "2-4 sentences: the pitch and the shape of the thing",
+  "hook_or_angle": "one line — why a parent stops and cares",
+  "audience": "who it's for + child age stage",
+  "educational_value": "what the parent learns or can do after",
+  "evidence_basis": "one line — which findings ground it + tier mix",
+  "source_finding_urls": ["Notion page URLs of every Findings row this rests on"],
+  "effort": "Low | Medium | High"
+}
+```
+
+`source_finding_urls` is mandatory (at least one) — it's the line between a
+grounded concept and a made-up one, and it lets you trace any idea back to the
+exact finding and its caveats.
+
+---
+
 ## Handoff / pipeline notes
 
 - **Sequential, not parallel.** Research runs a batch, fact-check consumes the whole batch. Don't fact-check one item at a time mid-research — you want the fact-checker to have full context on which claims recur across sources.
@@ -239,12 +310,19 @@ Implemented as Claude Code subagents in `.claude/agents/`:
   Content Drafts** database (`collection://9e923ada-33cd-49e1-a0b3-71e7de496cd4`,
   related back to the exact Findings rows it used via the `Source Findings`
   relation), and flips those Findings rows' `Content Status` to `Drafted`.
+- `idea-agent.md` — Notion query/fetch/create access, no WebSearch/WebFetch and
+  no update access (it doesn't modify Findings). Given a topic, queries the
+  Findings database for VERIFIED / VERIFIED_WITH_CAVEATS rows and writes a batch
+  of content-idea concepts to the **Early Childhood Content — Content Ideas**
+  database (`collection://c4600934-2973-4d6a-b1e8-35e96fb36449`, related back to
+  the Findings rows each idea rests on via `Source Findings`). On-demand only;
+  never part of the scheduled routine.
 
 To run the full pipeline: invoke `research-agent` with a topic (e.g. "sleep
 regressions in 18-24 month olds"), hand its JSON output to `fact-check-agent`
-in the same session, then — whenever you're ready to actually draft, not
-necessarily right away — invoke `script-writer-agent` with a topic and format.
-All three are dispatched via the Agent tool by name.
+in the same session, then — whenever you're ready, not necessarily right away —
+invoke `script-writer-agent` (to draft) and/or `idea-agent` (to brainstorm
+concepts) with a topic. All are dispatched via the Agent tool by name.
 
 The field names in both agent prompts and the Notion schema were kept
 identical on purpose — the fact-check agent maps 1:1, no translation step.

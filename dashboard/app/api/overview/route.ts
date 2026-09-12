@@ -21,9 +21,19 @@ export async function GET() {
       queryAll(DB.findings),
       queryAll(DB.drafts),
     ]);
+    // Ideas is a newer DB — if it isn't connected to the integration yet, don't
+    // break the whole overview; just report it as empty/unconfigured.
+    let ideas: any[] = [];
+    let ideasConfigured = true;
+    try {
+      ideas = await queryAll(DB.ideas);
+    } catch {
+      ideasConfigured = false;
+    }
     const q = queue.map(simplifyPage);
     const f = findings.map(simplifyPage);
     const d = drafts.map(simplifyPage);
+    const i = ideas.map(simplifyPage);
     return NextResponse.json({
       queue: { total: q.length, byStatus: tally(q, "Status"), byPriority: tally(q, "Priority") },
       findings: {
@@ -31,6 +41,7 @@ export async function GET() {
         byVerdict: tally(f, "Verdict"),
         byContentStatus: tally(f, "Content Status"),
       },
+      ideas: { total: i.length, byStatus: tally(i, "Status"), byCategory: tally(i, "Format Category"), configured: ideasConfigured },
       drafts: { total: d.length, byStatus: tally(d, "Status") },
     });
   } catch (e: any) {

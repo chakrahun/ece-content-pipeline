@@ -13,13 +13,13 @@ function elapsed(a: string, b?: string) {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-export function RunsPanel({ jobs }: { jobs: any[] }) {
+export function RunsPanel({ jobs, title = "Pipeline runs" }: { jobs: any[]; title?: string }) {
   const [viewing, setViewing] = useState<string | null>(null);
   if (!jobs || jobs.length === 0) return null;
 
   return (
     <div style={{ marginTop: 28 }}>
-      <h2>Pipeline runs</h2>
+      <h2>{title}</h2>
       <div className="panel">
         <table>
           <thead>

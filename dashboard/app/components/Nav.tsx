@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/", label: "Overview", icon: "◎" },
   { href: "/queue", label: "Topic Queue", icon: "☰" },
   { href: "/findings", label: "Findings", icon: "✓" },
+  { href: "/ideas", label: "Ideas", icon: "✦" },
   { href: "/drafts", label: "Drafts", icon: "✎" },
 ];
 

@@ -12,6 +12,7 @@ export const DB = {
   queue: process.env.NOTION_DB_QUEUE || "42fc97c5742546b499fd2b6f240334fd",
   findings: process.env.NOTION_DB_FINDINGS || "58c67e76cc884be39775bde5bf6b2c23",
   drafts: process.env.NOTION_DB_DRAFTS || "0db9b7caa9114bc7a0e18254cf605ca5",
+  ideas: process.env.NOTION_DB_IDEAS || "356b0b5c40f44701a8751209b5b45379",
 };
 
 export function assertConfigured() {

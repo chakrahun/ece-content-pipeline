@@ -34,6 +34,25 @@ export const FINDING_SOURCE_TIER = ["academic", "expert_commentary", "anecdotal"
 export const DRAFT_STATUS = ["Needs Review", "Approved", "Published", "Rejected"];
 export const DRAFT_FORMAT = ["Short-Form Video", "Long-Form Video", "Social Caption/Carousel"];
 
+// --- Content Ideas ---
+export const IDEA_STATUS = ["New", "Shortlisted", "In Production", "Made", "Archived"];
+export const IDEA_EFFORT = ["Low", "Medium", "High"];
+export const IDEA_FORMAT_CATEGORY = ["Digital Product", "Social Post", "Short-Form Video"];
+export const IDEA_PRODUCT_FORMAT = [
+  "Printable Pack",
+  "Activity Kit",
+  "Checklist / Cheat Sheet",
+  "Flashcards",
+  "Workbook / Journal",
+  "Ebook / Guide",
+  "Mini-Course",
+  "Email Course",
+  "Template / Tracker",
+  "Instagram Carousel",
+  "Instagram/Facebook Post",
+  "Short-Form Video",
+];
+
 // Property type map per database so the API knows how to build write payloads.
 export const WRITE_TYPES: Record<string, Record<string, string>> = {
   queue: {
@@ -48,5 +67,9 @@ export const WRITE_TYPES: Record<string, Record<string, string>> = {
   },
   drafts: {
     Status: "select",
+  },
+  ideas: {
+    Status: "select",
+    Effort: "select",
   },
 };

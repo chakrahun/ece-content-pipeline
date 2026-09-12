@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DB, queryAll, simplifyPage, assertConfigured } from "@/lib/notion";
-import { startRun, listJobs, isTopicRunning } from "@/lib/runner";
+import { startRun, listJobs, isTopicRunning, isIdeaRunning } from "@/lib/runner";
 
 export const dynamic = "force-dynamic";
 
@@ -10,14 +10,25 @@ export async function GET() {
 }
 
 // Start a run. Body:
-//   { topicId, topic }              -> run one topic
-//   { all: true }                   -> run every Queued topic
+//   { topicId, topic }              -> run research + fact-check on one topic
+//   { all: true }                   -> run research + fact-check on every Queued topic
+//   { kind: "ideas", topic }        -> generate content ideas for a topic
 export async function POST(req: NextRequest) {
   try {
     assertConfigured();
     const body = await req.json();
     const started: any[] = [];
     const skipped: any[] = [];
+
+    if (body.kind === "ideas") {
+      const topic = (body.topic || "").trim();
+      if (!topic) return NextResponse.json({ error: "topic is required." }, { status: 400 });
+      if (isIdeaRunning(topic)) {
+        return NextResponse.json({ error: "Idea generation for this topic is already running." }, { status: 409 });
+      }
+      started.push(startRun(topic, null, "ideas"));
+      return NextResponse.json({ started, skipped });
+    }
 
     if (body.all) {
       const rows = (await queryAll(DB.queue)).map(simplifyPage);
