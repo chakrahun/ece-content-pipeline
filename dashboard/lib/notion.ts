@@ -13,6 +13,7 @@ export const DB = {
   findings: process.env.NOTION_DB_FINDINGS || "58c67e76cc884be39775bde5bf6b2c23",
   drafts: process.env.NOTION_DB_DRAFTS || "0db9b7caa9114bc7a0e18254cf605ca5",
   ideas: process.env.NOTION_DB_IDEAS || "356b0b5c40f44701a8751209b5b45379",
+  assets: process.env.NOTION_DB_ASSETS || "1fa418a092294f538fc7ceb18da19711",
 };
 
 export function assertConfigured() {

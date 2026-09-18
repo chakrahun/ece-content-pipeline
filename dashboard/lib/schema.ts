@@ -32,7 +32,24 @@ export const FINDING_SOURCE_TIER = ["academic", "expert_commentary", "anecdotal"
 
 // --- Content Drafts ---
 export const DRAFT_STATUS = ["Needs Review", "Approved", "Published", "Rejected"];
-export const DRAFT_FORMAT = ["Short-Form Video", "Long-Form Video", "Social Caption/Carousel"];
+// Mirrors the Notion Format field, which now carries every Product Format a
+// drafted idea can be (video, social, and digital products).
+export const DRAFT_FORMAT = [
+  "Short-Form Video",
+  "Long-Form Video",
+  "Social Caption/Carousel",
+  "Printable Pack",
+  "Activity Kit",
+  "Checklist / Cheat Sheet",
+  "Flashcards",
+  "Workbook / Journal",
+  "Ebook / Guide",
+  "Mini-Course",
+  "Email Course",
+  "Template / Tracker",
+  "Instagram Carousel",
+  "Instagram/Facebook Post",
+];
 
 // --- Content Ideas ---
 export const IDEA_STATUS = ["New", "Shortlisted", "In Production", "Made", "Archived"];
@@ -52,6 +69,20 @@ export const IDEA_PRODUCT_FORMAT = [
   "Instagram/Facebook Post",
   "Short-Form Video",
 ];
+
+// --- Content Assets (Higgsfield visual shots) ---
+export const ASSET_STATUS = ["Prompt Ready", "Rendering", "Rendered", "Failed", "Skipped"];
+export const ASSET_SHOT_TYPE = ["Image", "Text-to-Video", "Image-to-Video"];
+// Exact Higgsfield endpoint paths passed straight to higgsfield.subscribe().
+export const ASSET_MODELS = [
+  "higgsfield-ai/soul/standard", // text-to-image (post slides / stills)
+  "kling-video/v2.5-turbo/standard/text-to-video",
+  "kling-video/v2.5-turbo/pro/image-to-video",
+  "bytedance/seedance/v1/lite/text-to-video",
+  "bytedance/seedance/v1/lite/image-to-video",
+  "veo3.1/fast/image-to-video",
+];
+export const ASSET_ASPECT_RATIO = ["9:16", "1:1", "4:5", "16:9", "4:3", "2:3", "3:2"];
 
 // Property type map per database so the API knows how to build write payloads.
 export const WRITE_TYPES: Record<string, Record<string, string>> = {
